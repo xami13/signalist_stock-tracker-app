@@ -51,7 +51,6 @@ next-env.d.ts
 *~
 
 # OS junk
-.DS_Store
 Thumbs.db
 desktop.ini
 ehthumbs.db
