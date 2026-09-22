@@ -1,5 +1,18 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Test the database connection
+
+1. Open PowerShell in `C:\Users\User\Desktop\stocks_app`.
+2. Run `node --version`. The database test uses native TypeScript support; use Node.js 22.18+ or 24+ (verified with 24.19.0).
+3. If dependencies are not installed, run `npm install`.
+4. Confirm the root `.env` file contains `MONGODB_URI` with your MongoDB connection string. Keep the value private. The test loads environment files using Next.js rules and defaults to development; existing shell variables and higher-priority environment files can override `.env`.
+5. Run `npm run test:db`.
+6. Look for all four `PASS` lines and `Database connection test passed`. In PowerShell, `$LASTEXITCODE` should be `0`.
+
+The test calls the actual `database/mongoose.ts` helper, checks the connection state, sends `{ ping: 1 }`, verifies connection reuse, and disconnects. It does not read or modify documents, so it does not verify collection read/write permissions or application queries. No development server is required.
+
+If it fails, check the reported stage: confirm `MONGODB_URI` is set, verify database credentials and `authSource`, and check DNS/network connectivity and the database IP access list. The test stops after 45 seconds and returns a nonzero exit code on failure. A Node `MODULE_TYPELESS_PACKAGE_JSON` warning may appear when importing the TypeScript helper; it does not indicate a database failure.
+
 ## Getting Started
 
 First, run the development server:
