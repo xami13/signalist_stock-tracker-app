@@ -1,5 +1,5 @@
 'use client';
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -11,32 +11,39 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {useRouter} from "next/navigation";
+import {useRouter, usePathname} from "next/navigation";
 import {LogOut} from "lucide-react";
-import NavItems from "@/components/NavItems";
+import { NAV_ITEMS } from "@/lib/constants";
+import {signOut} from "@/lib/actions/auth.actions";
 
-const UserDropdown = () => {
+
+const UserDropdown = ({ user }: {user: User}) => {
     const router = useRouter();
+    const pathname: string = usePathname();
+
+    const isActive: (path: string) => boolean = (path: string) => {
+        if (path === '/') return pathname === '/';
+        return pathname.startsWith(path);
+    };
 
     const handleSignOut: () => Promise<void> = async () => {
+        await signOut();
         router.push("/sign-in");
     }
-
-    const user = { name: 'xami', email: 'contact@xami.com' };
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger
                 className={cn(
                     buttonVariants({ variant: "ghost", size: "lg" }),
-                    "flex items-center gap-3 text-gray-4 hover:text-yellow-500"
+                    "flex items-center gap-3 text-gray-400 hover:text-yellow-500"
                 )}
             >
 
                 <Avatar className={"h-8 w-8"}>
                     <AvatarImage src="https://i.pinimg.com/236x/87/bf/a2/87bfa2e8b5157adcb14fede6b5b7b7f9.jpg" />
                     <AvatarFallback className={"bg-yellow-500 text-yellow-900 text-sm font-bold"}>
-                        {user.name[0]}
+                        {user.name?.[0] ?? user.email?.[0]?.toUpperCase() ?? "U"}
                     </AvatarFallback>
                 </Avatar>
 
@@ -56,7 +63,7 @@ const UserDropdown = () => {
                         <Avatar className={"h-10 w-10"}>
                             <AvatarImage src="https://i.pinimg.com/236x/87/bf/a2/87bfa2e8b5157adcb14fede6b5b7b7f9.jpg" />
                             <AvatarFallback className={"bg-yellow-500 text-yellow-900 text-sm font-bold"}>
-                                {user.name[0]}
+                                {user.name?.[0] ?? user.email?.[0]?.toUpperCase() ?? "U"}
                             </AvatarFallback>
                         </Avatar>
 
@@ -74,15 +81,25 @@ const UserDropdown = () => {
                 <DropdownMenuSeparator className={"bg-gray-600"}/>
 
                 <DropdownMenuItem onClick={handleSignOut} className={"text-gray-100 text-md font-medium focus:bg-transparent focus:text-yellow-500 transition-colors cursor-pointer"}>
-                    <LogOut className={"h-4 w-5 mr-2 hidden sm:block"} />
+                    <LogOut className={"h-4 w-5 mr-2 bg-gray-600"} />
                     Logout
                 </DropdownMenuItem>
 
-                    <DropdownMenuSeparator className={"hidden sm:block bg-gray-600"}/>
+                <DropdownMenuSeparator className={"bg-gray-600"}/>
 
-                    <nav className={"sm:hidden"}>
-                        <NavItems/>
-                    </nav>
+                {NAV_ITEMS.map(({ href, label }) => (
+                    <DropdownMenuItem
+                        key={href}
+                        onClick={() => router.push(href)}
+                        className={
+                            `text-gray-100 text-md font-medium cursor-pointer transition-colors focus:bg-transparent focus:text-yellow-500 ${
+                                isActive(href) ? 'text-yellow-500' : ''
+                            }`
+                        }
+                    >
+                        {label}
+                    </DropdownMenuItem>
+                ))}
 
                 </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -90,3 +107,4 @@ const UserDropdown = () => {
     )
 }
 export default UserDropdown
+
