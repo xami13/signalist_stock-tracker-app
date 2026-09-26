@@ -14,7 +14,8 @@ async function getGeneralNews(): Promise<MarketNewsArticle[]> {
     url.searchParams.set('category', 'general');
     url.searchParams.set('token', NEXT_PUBLIC_FINNHUB_API_KEY!);
 
-    const articles = await fetchJSON<RawNewsArticle[]>(url.toString());
+    const response = await fetchJSON<unknown>(url.toString());
+    const articles = Array.isArray(response) ? response as RawNewsArticle[] : [];
     const seen = new Set<string>();
     return articles.filter(validateArticle).filter((article) => {
         const keys = [`id:${article.id}`, `url:${article.url}`, `headline:${article.headline?.trim().toLowerCase()}`];
@@ -29,7 +30,7 @@ type FinnhubProfile = {
     exchange?: string;
 };
 
-async function fetchJSON<T>(url: string, revalidateSeconds?: number): Promise<T> {
+export async function fetchJSON<T>(url: string, revalidateSeconds?: number): Promise<T> {
     const response = await fetch(url, revalidateSeconds === undefined
         ? { cache: 'no-store' }
         : { cache: 'force-cache', next: { revalidate: revalidateSeconds } });
@@ -103,7 +104,9 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
             url.searchParams.set('from', from);
             url.searchParams.set('to', to);
             url.searchParams.set('token', NEXT_PUBLIC_FINNHUB_API_KEY);
-            return { symbol, articles: (await fetchJSON<RawNewsArticle[]>(url.toString())).filter(validateArticle) };
+            const response = await fetchJSON<unknown>(url.toString());
+            const articles = Array.isArray(response) ? response as RawNewsArticle[] : [];
+            return { symbol, articles: articles.filter(validateArticle) };
         }));
 
         const result: MarketNewsArticle[] = [];

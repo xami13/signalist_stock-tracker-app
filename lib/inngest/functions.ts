@@ -54,10 +54,10 @@ export const sendSignUpEmail = inngest.createFunction(
 export const sendDailyNewsSummary = inngest.createFunction(
     {
         id: 'daily-news-summary',
-        // Once a day at 13:00 UTC (≈ NYSE open) Mon–Fri; throttle prevents AI-gateway stampedes.
+        // Once a day at 12:00 UTC; throttle prevents duplicate delivery bursts.
         triggers: [
             { event: 'app/send.daily.news' },
-            { cron: '0 6 * * *' }, // 12:00 pm daily UTC+6
+            { cron: '0 12 * * *' }, // 12:00 PM UTC daily
         ],
         concurrency: { limit: 1, key: 'daily-news-summary' },
         throttle: { limit: 1, period: '5m', key: 'daily-news-summary' },
@@ -68,7 +68,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
         // Step #1: Get all users for news delivery
         const users = await step.run('get-all-users', getAllUsersForNewsEmail)
 
-        if(!users || users.length === 0) return { success: false, message: 'No users found for news email' };
+        if (!users || users.length === 0) return { success: true };
 
         // Step #2: For each user, get watchlist symbols -> fetch news (fallback to general)
         const results = await step.run('fetch-user-news', async () => {
