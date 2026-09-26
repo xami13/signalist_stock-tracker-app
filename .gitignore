@@ -77,3 +77,11 @@ logs/
 /test-gemini-verify.ps1
 /test-gemini.ps1
 /trigger.ps1
+
+# editor / tool caches
+/.plugin-cache
+
+# vendored reference templates (keep their node_modules out of the repo)
+/_my-mongodb-app-template
+/_my-mongodb-app-template/**
+
