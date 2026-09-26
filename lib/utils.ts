@@ -73,8 +73,12 @@ export const calculateNewsDistribution = (symbolsCount: number) => {
 };
 
 // Check for required article fields
-export const validateArticle = (article: RawNewsArticle) =>
-    article.headline && article.summary && article.url && article.datetime;
+export const validateArticle = (article: RawNewsArticle): article is RawNewsArticle & {
+    headline: string;
+    summary: string;
+    url: string;
+    datetime: number;
+} => Boolean(article.headline?.trim() && article.summary?.trim() && article.url?.trim() && article.datetime);
 
 // Get today's date string in YYYY-MM-DD format
 export const getTodayString = () => new Date().toISOString().split('T')[0];
@@ -84,7 +88,7 @@ export const formatArticle = (
     isCompanyNews: boolean,
     symbol?: string,
     index: number = 0
-) => ({
+): MarketNewsArticle => ({
     id: isCompanyNews ? Date.now() + Math.random() : article.id + index,
     headline: article.headline!.trim(),
     summary:
