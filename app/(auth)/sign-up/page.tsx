@@ -11,7 +11,6 @@ import FooterLink from "@/components/forms/FooterLink";
 import {signUpWithEmail} from "@/lib/actions/auth.actions";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {error} from "better-auth/api";
 
 const SignUp = () => {
     const router = useRouter();
@@ -36,7 +35,10 @@ const SignUp = () => {
     const onSubmit = async (data: SignUpFormData) => {
         try{
             const result = await signUpWithEmail(data);
-            if(result.success) router.push("/");
+            if(result.success) {
+                // full reload so the session cookie set during the server action is picked up by the next request
+                window.location.href = "/";
+            }
         } catch (e) {
             console.log(e);
             toast.error('Sign up failed.',{
@@ -66,7 +68,13 @@ const SignUp = () => {
                     placeholder={"contact@name.com"}
                     register={register}
                     error={errors.email}
-                    validation={{required: 'Email is required', pattern: /^\w+@\w+\.\w+$/, message: 'Email is required'}}
+                    validation={{
+                        required: 'Email is required',
+                        pattern: {
+                            value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                            message: 'Enter a valid email address',
+                        },
+                    }}
                 />
 
                 <InputField

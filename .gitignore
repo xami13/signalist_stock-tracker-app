@@ -85,3 +85,17 @@ logs/
 /_my-mongodb-app-template
 /_my-mongodb-app-template/**
 
+# extra local-only ignores
+# OS / shell noise
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# local env overrides
+.env.local
+.env.*.local
+
+# turbo / nx caches
+.turbo/
+.nx/cache
