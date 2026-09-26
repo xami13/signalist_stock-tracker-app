@@ -15,9 +15,10 @@ import {useRouter, usePathname} from "next/navigation";
 import {LogOut} from "lucide-react";
 import { NAV_ITEMS } from "@/lib/constants";
 import {signOut} from "@/lib/actions/auth.actions";
+import NavItems from "@/components/NavItems";
 
 
-const UserDropdown = ({ user }: {user: User}) => {
+const UserDropdown = ({ user, initialStocks }: {user: User, initialStocks: StockWithWatchlistStatus[ ]}) => {
     const router = useRouter();
     const pathname: string = usePathname();
 
@@ -86,6 +87,10 @@ const UserDropdown = ({ user }: {user: User}) => {
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator className={"bg-gray-600"}/>
+
+                    <nav className={"sm:hidden"}>
+                        <NavItems initialStocks={initialStocks}/>
+                    </nav>
 
                 {NAV_ITEMS.map(({ href, label }) => (
                     <DropdownMenuItem

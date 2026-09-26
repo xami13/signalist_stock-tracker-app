@@ -57,7 +57,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
         // Once a day at 13:00 UTC (≈ NYSE open) Mon–Fri; throttle prevents AI-gateway stampedes.
         triggers: [
             { event: 'app/send.daily.news' },
-            { cron: '0 6 * * *' },
+            { cron: '0 6 * * *' }, // 12:00 pm daily UTC+6
         ],
         concurrency: { limit: 1, key: 'daily-news-summary' },
         throttle: { limit: 1, period: '5m', key: 'daily-news-summary' },
