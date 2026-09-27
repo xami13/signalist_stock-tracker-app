@@ -294,7 +294,7 @@ NEXT_PUBLIC_FINNHUB_API_KEY=your-finnhub-api-key
 
 # AI generation
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-2.5-flash-lite || your preferred model (ideally fast & lightweight)
+GEMINI_MODEL=gemini-3.5-flash-lite || your preferred model (ideally fast & lightweight)
 
 # Gmail transport
 NODEMAILER_EMAIL=your-sender@gmail.com

@@ -66,6 +66,29 @@ type FinnhubFinancials = {
     };
 };
 
+export type StockQuote = {
+    currentPrice: number;
+    changePercent: number;
+};
+
+export async function getStockQuote(symbol: string): Promise<StockQuote> {
+    if (!NEXT_PUBLIC_FINNHUB_API_KEY) throw new Error('NEXT_PUBLIC_FINNHUB_API_KEY is missing');
+
+    const quoteUrl = new URL(`${FINNHUB_BASE_URL}/quote`);
+    quoteUrl.searchParams.set('symbol', symbol.trim().toUpperCase());
+    quoteUrl.searchParams.set('token', NEXT_PUBLIC_FINNHUB_API_KEY);
+    const quote = await fetchJSON<QuoteData>(quoteUrl.toString());
+
+    if (typeof quote.c !== 'number' || quote.c <= 0) {
+        throw new Error(`No current quote available for ${symbol}`);
+    }
+
+    return {
+        currentPrice: quote.c,
+        changePercent: typeof quote.dp === 'number' ? quote.dp : 0,
+    };
+}
+
 export async function fetchJSON<T>(url: string, revalidateSeconds?: number): Promise<T> {
     const response = await fetch(url, revalidateSeconds === undefined
         ? { cache: 'no-store' }

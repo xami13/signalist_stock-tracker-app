@@ -1,10 +1,25 @@
 import {inngest} from "@/lib/inngest/client";
 import {NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT} from "@/lib/inngest/prompts";
-import {sendWelcomeEmail, sendNewsSummaryEmail} from "@/lib/nodemailer";
+import {
+    sendInactiveUserReminderEmail,
+    sendNewsSummaryEmail,
+    sendPriceAlertEmail,
+    sendWelcomeEmail,
+} from "@/lib/nodemailer";
 import {getAllUsersForNewsEmail} from "@/lib/actions/user.actions";
 import {getWatchlistSymbolsByEmail} from "@/lib/actions/watchlist.actions";
-import {getNews} from "@/lib/actions/finnhub.actions";
+import {getNews, getStockQuote} from "@/lib/actions/finnhub.actions";
 import {formatDateToday} from "@/lib/utils";
+import {connectToDatabase} from "@/database/mongoose";
+import PriceAlert, {type PriceAlertDocument} from "@/database/models/alert.model";
+
+const frequencyMilliseconds: Record<PriceAlertDocument['frequency'], number> = {
+    minute: 60_000,
+    hour: 60 * 60_000,
+    day: 24 * 60 * 60_000,
+};
+
+const safeStepId = (value: unknown) => String(value).replace(/[^a-zA-Z0-9_-]/g, '-');
 
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
@@ -136,3 +151,146 @@ export const sendDailyNewsSummary = inngest.createFunction(
         return { success: true, message: 'Daily news summary emails sent successfully' }
     }
 )
+
+export const checkPriceAlerts = inngest.createFunction(
+    {
+        id: 'check-price-alerts',
+        triggers: [
+            { event: 'app/check.price.alerts' },
+            { cron: '* * * * *' },
+        ],
+        concurrency: { limit: 1, key: 'check-price-alerts' },
+        retries: 2,
+    },
+    async ({ step }) => {
+        const alerts = await step.run('get-due-price-alerts', async () => {
+            await connectToDatabase();
+            const now = Date.now();
+            const records = await PriceAlert.find({}).lean();
+
+            return records.filter((alert) => {
+                if (!alert.lastCheckedAt) return true;
+                return now - new Date(alert.lastCheckedAt).getTime() >= frequencyMilliseconds[alert.frequency];
+            }).map((alert) => ({
+                id: alert._id.toString(),
+                userId: alert.userId,
+                symbol: alert.symbol,
+                company: alert.company,
+                alertType: alert.alertType,
+                threshold: alert.threshold,
+                conditionMet: alert.conditionMet ?? false,
+            }));
+        });
+
+        if (alerts.length === 0) return { success: true, checked: 0, sent: 0 };
+
+        const quotes = await step.run('fetch-alert-quotes', async () => {
+            const symbols = [...new Set(alerts.map((alert) => alert.symbol))];
+            const results = await Promise.allSettled(symbols.map(async (symbol) => ({
+                symbol,
+                quote: await getStockQuote(symbol),
+            })));
+
+            return results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+        });
+        const quoteBySymbol = new Map(quotes.map(({ symbol, quote }) => [symbol, quote]));
+
+        const userIds = [...new Set(alerts.map((alert) => alert.userId))];
+        const users = await step.run('get-alert-users', async () => {
+            const mongoose = await connectToDatabase();
+            const db = mongoose.connection.db;
+            if (!db) throw new Error('MongoDB connection failed');
+            return db.collection('user').find(
+                { id: { $in: userIds } },
+                { projection: { id: 1, email: 1 } },
+            ).toArray();
+        });
+        const emailByUserId = new Map(users.map((user) => [String(user.id), String(user.email)]));
+        let sent = 0;
+
+        for (const alert of alerts) {
+            const quote = quoteBySymbol.get(alert.symbol);
+            if (!quote) continue;
+            const conditionMet = alert.alertType === 'upper'
+                ? quote.currentPrice >= alert.threshold
+                : quote.currentPrice <= alert.threshold;
+            const shouldNotify = conditionMet && !alert.conditionMet;
+
+            if (shouldNotify) {
+                const email = emailByUserId.get(alert.userId);
+                if (email) {
+                    await step.run(`send-price-alert-${safeStepId(alert.id)}`, () => sendPriceAlertEmail({
+                        email,
+                        symbol: alert.symbol,
+                        company: alert.company,
+                        alertType: alert.alertType,
+                        targetPrice: alert.threshold,
+                        currentPrice: quote.currentPrice,
+                        timestamp: new Date().toLocaleString('en-US', { timeZone: 'UTC', timeZoneName: 'short' }),
+                    }));
+                    sent += 1;
+                }
+            }
+
+            await step.run(`update-price-alert-${safeStepId(alert.id)}`, async () => {
+                await connectToDatabase();
+                await PriceAlert.findByIdAndUpdate(
+                    alert.id,
+                    {
+                        $set: {
+                            conditionMet,
+                            lastCheckedAt: new Date(),
+                            ...(shouldNotify ? { lastTriggeredAt: new Date() } : {}),
+                        },
+                    },
+                );
+            });
+        }
+
+        return { success: true, checked: alerts.length, sent };
+    },
+);
+
+export const sendInactiveUserReminders = inngest.createFunction(
+    {
+        id: 'send-inactive-user-reminders',
+        triggers: [
+            { event: 'app/send.inactive.reminders' },
+            { cron: '0 14 * * *' },
+        ],
+        concurrency: { limit: 1, key: 'inactive-user-reminders' },
+        retries: 2,
+    },
+    async ({ step }) => {
+        const users = await step.run('get-inactive-users', async () => {
+            const mongoose = await connectToDatabase();
+            const db = mongoose.connection.db;
+            if (!db) throw new Error('MongoDB connection failed');
+
+            const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60_000);
+            return db.collection('user').find({
+                email: { $exists: true, $ne: null },
+                $and: [
+                    { $or: [{ lastLoginAt: { $lt: cutoff } }, { lastLoginAt: { $exists: false }, createdAt: { $lt: cutoff } }] },
+                    { $or: [{ lastInactiveReminderAt: { $lt: cutoff } }, { lastInactiveReminderAt: { $exists: false } }] },
+                ],
+            }, { projection: { _id: 1, email: 1, name: 1 } }).toArray();
+        });
+
+        for (const user of users) {
+            await step.run(`remind-inactive-${safeStepId(user._id)}`, async () => {
+                await sendInactiveUserReminderEmail({
+                    email: String(user.email),
+                    name: String(user.name || 'Investor'),
+                });
+                const mongoose = await connectToDatabase();
+                await mongoose.connection.db?.collection('user').updateOne(
+                    { email: String(user.email) },
+                    { $set: { lastInactiveReminderAt: new Date() } },
+                );
+            });
+        }
+
+        return { success: true, sent: users.length };
+    },
+);
