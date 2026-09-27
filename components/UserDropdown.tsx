@@ -11,21 +11,14 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {useRouter, usePathname} from "next/navigation";
+import {useRouter} from "next/navigation";
 import {LogOut} from "lucide-react";
-import { NAV_ITEMS } from "@/lib/constants";
 import {signOut} from "@/lib/actions/auth.actions";
 import NavItems from "@/components/NavItems";
 
 
 const UserDropdown = ({ user, initialStocks }: {user: User, initialStocks: StockWithWatchlistStatus[ ]}) => {
     const router = useRouter();
-    const pathname: string = usePathname();
-
-    const isActive: (path: string) => boolean = (path: string) => {
-        if (path === '/') return pathname === '/';
-        return pathname.startsWith(path);
-    };
 
     const handleSignOut: () => Promise<void> = async () => {
         await signOut();
@@ -56,7 +49,7 @@ const UserDropdown = ({ user, initialStocks }: {user: User, initialStocks: Stock
 
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className={"w-64 max-w-[calc(100vw-2rem)] text-gray-400"}>
+            <DropdownMenuContent align="end" className={"w-72 max-w-[calc(100vw-2rem)] text-gray-400"}>
                 <DropdownMenuGroup>
                 <DropdownMenuLabel>
                     <div className={"flex relative items-center gap-3 py-2"}>
@@ -73,7 +66,7 @@ const UserDropdown = ({ user, initialStocks }: {user: User, initialStocks: Stock
                             {user.name}
                         </span>
 
-                            <span className={"text-sm text-gray-500 [overflow-wrap:anywhere]"}>{user.email}</span>
+                            <span className={"truncate whitespace-nowrap text-sm text-gray-500"}>{user.email}</span>
 
                         </div>
 
@@ -82,30 +75,13 @@ const UserDropdown = ({ user, initialStocks }: {user: User, initialStocks: Stock
                 <DropdownMenuSeparator className={"bg-gray-600"}/>
 
                 <DropdownMenuItem onClick={handleSignOut} className={"text-gray-100 text-md font-medium focus:bg-transparent focus:text-yellow-500 transition-colors cursor-pointer"}>
-                    <LogOut className={"h-4 w-5 mr-2 bg-gray-600"} />
+                    <LogOut className={"mr-2 h-4 w-5"} />
                     Logout
                 </DropdownMenuItem>
-
-                <DropdownMenuSeparator className={"bg-gray-600"}/>
 
                     <nav className={"sm:hidden"}>
                         <NavItems initialStocks={initialStocks}/>
                     </nav>
-
-                {NAV_ITEMS.map(({ href, label }) => (
-                    <DropdownMenuItem
-                        key={href}
-                        onClick={() => router.push(href)}
-                        className={
-                            `text-gray-100 text-md font-medium cursor-pointer transition-colors focus:bg-transparent focus:text-yellow-500 ${
-                                isActive(href) ? 'text-yellow-500' : ''
-                            }`
-                        }
-                    >
-                        {label}
-                    </DropdownMenuItem>
-                ))}
-
                 </DropdownMenuGroup>
             </DropdownMenuContent>
         </DropdownMenu>
