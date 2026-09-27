@@ -8,6 +8,9 @@ export interface PriceAlertDocument extends Document {
     alertType: 'upper' | 'lower';
     threshold: number;
     frequency: 'minute' | 'hour' | 'day';
+    lastCheckedAt?: Date;
+    lastTriggeredAt?: Date;
+    conditionMet: boolean;
     createdAt: Date;
 }
 
@@ -19,6 +22,9 @@ const alertSchema = new Schema<PriceAlertDocument>({
     alertType: { type: String, enum: ['upper', 'lower'], required: true },
     threshold: { type: Number, required: true, min: 0 },
     frequency: { type: String, enum: ['minute', 'hour', 'day'], default: 'day' },
+    lastCheckedAt: { type: Date },
+    lastTriggeredAt: { type: Date },
+    conditionMet: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
 });
 

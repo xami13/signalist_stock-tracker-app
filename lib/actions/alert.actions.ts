@@ -52,7 +52,10 @@ export async function saveAlert(input: PriceAlertInput): Promise<{ success: bool
             frequency: input.frequency,
         };
         if (input.id) {
-            await PriceAlert.updateOne({ _id: input.id, userId }, { $set: values });
+            await PriceAlert.updateOne(
+                { _id: input.id, userId },
+                { $set: { ...values, conditionMet: false }, $unset: { lastCheckedAt: 1 } },
+            );
         } else {
             await PriceAlert.create(values);
         }
