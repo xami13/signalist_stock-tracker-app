@@ -2,11 +2,38 @@
 
 import { cache } from 'react';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
-import { formatArticle, getDateRange, validateArticle } from '@/lib/utils';
+import {
+    formatArticle,
+    formatChangePercent,
+    formatMarketCapValue,
+    formatPrice,
+    getDateRange,
+    validateArticle,
+} from '@/lib/utils';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const NEXT_PUBLIC_FINNHUB_API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
 const MAX_ARTICLES = 6;
+
+class FinnhubRateLimitError extends Error {
+    constructor() {
+        super('Finnhub rate limit reached');
+        this.name = 'FinnhubRateLimitError';
+    }
+}
+
+const POPULAR_STOCK_NAMES: Record<string, string> = {
+    AAPL: 'Apple Inc.',
+    MSFT: 'Microsoft Corporation',
+    GOOGL: 'Alphabet Inc.',
+    AMZN: 'Amazon.com Inc.',
+    TSLA: 'Tesla Inc.',
+    META: 'Meta Platforms Inc.',
+    NVDA: 'NVIDIA Corporation',
+    NFLX: 'Netflix Inc.',
+    ORCL: 'Oracle Corporation',
+    CRM: 'Salesforce Inc.',
+};
 
 
 async function getGeneralNews(): Promise<MarketNewsArticle[]> {
@@ -28,6 +55,15 @@ async function getGeneralNews(): Promise<MarketNewsArticle[]> {
 type FinnhubProfile = {
     name?: string;
     exchange?: string;
+    marketCapitalization?: number;
+    logo?: string;
+};
+
+type FinnhubFinancials = {
+    metric?: {
+        peNormalizedAnnual?: number;
+        peBasicExclExtraTTM?: number;
+    };
 };
 
 export async function fetchJSON<T>(url: string, revalidateSeconds?: number): Promise<T> {
@@ -35,6 +71,7 @@ export async function fetchJSON<T>(url: string, revalidateSeconds?: number): Pro
         ? { cache: 'no-store' }
         : { cache: 'force-cache', next: { revalidate: revalidateSeconds } });
 
+    if (response.status === 429) throw new FinnhubRateLimitError();
     if (!response.ok) throw new Error(`Finnhub request failed: ${response.status}`);
     const data: unknown = await response.json();
     return data as T;
@@ -48,26 +85,12 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
         const trimmed = query?.trim();
 
         if (!trimmed) {
-            const symbols = POPULAR_STOCK_SYMBOLS.slice(0, 10);
-            const profiles = await Promise.all(
-                symbols.map(async (symbol) => {
-                    const url = new URL(`${FINNHUB_BASE_URL}/stock/profile2`);
-                    url.searchParams.set('symbol', symbol);
-                    url.searchParams.set('token', NEXT_PUBLIC_FINNHUB_API_KEY);
-                    return fetchJSON<FinnhubProfile>(url.toString(), 3600);
-                })
-            );
-
-            results = symbols.map((symbol, index) => {
-                const profile = profiles[index];
-                return {
-                    symbol,
-                    description: profile?.name ?? symbol,
-                    displaySymbol: symbol,
-                    type: 'Common Stock',
-                    exchange: profile?.exchange ?? 'US',
-                };
-            });
+            results = POPULAR_STOCK_SYMBOLS.slice(0, 10).map((symbol) => ({
+                symbol,
+                description: POPULAR_STOCK_NAMES[symbol] ?? symbol,
+                displaySymbol: symbol,
+                type: 'Common Stock',
+            }));
         } else {
             const url = new URL(`${FINNHUB_BASE_URL}/search`);
             url.searchParams.set('q', encodeURIComponent(trimmed));
@@ -85,10 +108,54 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
             isInWatchlist: false,
         }));
     } catch (error) {
-        console.error('Error in stock search:', error);
+        if (!(error instanceof FinnhubRateLimitError)) console.error('Error in stock search:', error);
         return [];
     }
 });
+
+export async function getWatchlistMarketData(items: StockWithData[]): Promise<StockWithData[]> {
+    if (!NEXT_PUBLIC_FINNHUB_API_KEY || items.length === 0) return items;
+
+    return Promise.all(items.map(async (item) => {
+        try {
+            const quoteUrl = new URL(`${FINNHUB_BASE_URL}/quote`);
+            quoteUrl.searchParams.set('symbol', item.symbol);
+            quoteUrl.searchParams.set('token', NEXT_PUBLIC_FINNHUB_API_KEY);
+            const profileUrl = new URL(`${FINNHUB_BASE_URL}/stock/profile2`);
+            profileUrl.searchParams.set('symbol', item.symbol);
+            profileUrl.searchParams.set('token', NEXT_PUBLIC_FINNHUB_API_KEY);
+            const financialsUrl = new URL(`${FINNHUB_BASE_URL}/stock/metric`);
+            financialsUrl.searchParams.set('symbol', item.symbol);
+            financialsUrl.searchParams.set('metric', 'all');
+            financialsUrl.searchParams.set('token', NEXT_PUBLIC_FINNHUB_API_KEY);
+
+            const [quote, profile, financials] = await Promise.all([
+                fetchJSON<QuoteData>(quoteUrl.toString()),
+                fetchJSON<FinnhubProfile>(profileUrl.toString(), 3600),
+                fetchJSON<FinnhubFinancials>(financialsUrl.toString(), 3600),
+            ]);
+            const currentPrice = quote.c;
+            const changePercent = quote.dp;
+            const marketCapMillions = profile.marketCapitalization;
+            const peRatio = financials.metric?.peNormalizedAnnual ?? financials.metric?.peBasicExclExtraTTM;
+
+            return {
+                ...item,
+                company: profile.name || item.company,
+                currentPrice,
+                changePercent,
+                priceFormatted: currentPrice ? formatPrice(currentPrice) : '—',
+                changeFormatted: typeof changePercent === 'number' ? formatChangePercent(changePercent) : '—',
+                marketCap: marketCapMillions ? formatMarketCapValue(marketCapMillions * 1_000_000) : '—',
+                peRatio: peRatio ? peRatio.toFixed(1) : '—',
+                logo: profile.logo || '',
+            };
+        } catch (error) {
+            if (!(error instanceof FinnhubRateLimitError)) console.error(`Error fetching market data for ${item.symbol}:`, error);
+            return { ...item, priceFormatted: '—', changeFormatted: '—', marketCap: '—', peRatio: '—' };
+        }
+    }));
+}
 
 export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> {
     try {
@@ -128,7 +195,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
         if (result.length === 0) return getGeneralNews();
         return result.sort((a, b) => b.datetime - a.datetime);
     } catch (error) {
-        console.error('Error fetching news:', error);
+        if (!(error instanceof FinnhubRateLimitError)) console.error('Error fetching news:', error);
         throw new Error('Failed to fetch news');
     }
 }

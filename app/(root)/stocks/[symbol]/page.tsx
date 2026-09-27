@@ -8,10 +8,15 @@ import {
     SYMBOL_INFO_WIDGET_CONFIG,
     TECHNICAL_ANALYSIS_WIDGET_CONFIG,
 } from "@/lib/constants";
+import { auth } from '@/lib/better-auth/auth';
+import { headers } from 'next/headers';
+import { getWatchlistSymbolsByEmail } from '@/lib/actions/watchlist.actions';
 
 const StockDetails = async ({ params }: StockDetailsPageProps) => {
     const { symbol } = await params;
     const upperSymbol = symbol.toUpperCase();
+    const session = await auth.api.getSession({ headers: await headers() });
+    const watchedSymbols = session?.user.email ? await getWatchlistSymbolsByEmail(session.user.email) : [];
 
     const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
@@ -43,7 +48,7 @@ const StockDetails = async ({ params }: StockDetailsPageProps) => {
                 <WatchlistButton
                     symbol={upperSymbol}
                     company={upperSymbol}
-                    isInWatchlist={false}
+                    isInWatchlist={watchedSymbols.includes(upperSymbol)}
                 />
 
                 <TradingViewWidget

@@ -56,9 +56,12 @@ declare global {
     };
 
     type SearchCommandProps = {
+        initialStocks: StockWithWatchlistStatus[];
         renderAs?: 'button' | 'text';
         label?: string;
-        initialStocks: StockWithWatchlistStatus[];
+        open?: boolean;
+        setOpen?: (open: boolean) => void;
+        className?: string;
     };
 
     type WelcomeEmailData = {
@@ -133,6 +136,8 @@ declare global {
 
     type WatchlistTableProps = {
         watchlist: StockWithData[];
+        onCreateAlert?: (stock: SelectedStock) => void;
+        onRemove?: (symbol: string) => void;
     };
 
     type StockWithData = {
@@ -146,6 +151,7 @@ declare global {
         changeFormatted?: string;
         marketCap?: string;
         peRatio?: string;
+        logo?: string;
     };
 
     type AlertsListProps = {
@@ -168,21 +174,29 @@ declare global {
         news?: MarketNewsArticle[];
     };
 
-    type SearchCommandProps = {
-        open?: boolean;
-        setOpen?: (open: boolean) => void;
-        renderAs?: 'button' | 'text';
-        buttonLabel?: string;
-        buttonVariant?: 'primary' | 'secondary';
-        className?: string;
-    };
-
     type AlertData = {
         symbol: string;
         company: string;
         alertName: string;
         alertType: 'upper' | 'lower';
         threshold: string;
+    };
+
+    type AlertFrequency = 'minute' | 'hour' | 'day';
+
+    type PriceAlert = {
+        id: string;
+        symbol: string;
+        company: string;
+        alertName: string;
+        alertType: 'upper' | 'lower';
+        threshold: number;
+        frequency: AlertFrequency;
+    };
+
+    type PriceAlertInput = Omit<PriceAlert, 'id' | 'threshold'> & {
+        id?: string;
+        threshold: number | string;
     };
 
     type AlertModalProps = {
@@ -205,16 +219,7 @@ declare global {
         related?: string;
     };
 
-    type Alert = {
-        id: string;
-        symbol: string;
-        company: string;
-        alertName: string;
-        currentPrice: number;
-        alertType: 'upper' | 'lower';
-        threshold: number;
-        changePercent?: number;
-    };
+    type Alert = PriceAlert & { currentPrice?: number; changePercent?: number };
 }
 
 export {};

@@ -63,6 +63,7 @@ logs/
 # temp / cache
 .tmp/
 .cache/
+/.plugin-cache/
 .eslintcache
 .stylelintcache
 
@@ -74,6 +75,7 @@ logs/
 /CLAUDE.md
 
 # local scratch / one-off scripts
+/_my-mongodb-app-template/
 /test-gemini-verify.ps1
 /test-gemini.ps1
 /trigger.ps1
