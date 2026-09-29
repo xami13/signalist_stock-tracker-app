@@ -155,10 +155,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
 export const checkPriceAlerts = inngest.createFunction(
     {
         id: 'check-price-alerts',
-        triggers: [
-            { event: 'app/check.price.alerts' },
-            { cron: '* * * * *' },
-        ],
+        triggers: [{ cron: '0 12 * * *' }],
         concurrency: { limit: 1, key: 'check-price-alerts' },
         retries: 2,
     },
